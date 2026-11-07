@@ -1,0 +1,111 @@
+name: DeepSharp Windows installer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+
+jobs:
+  build-installer:
+    name: Build Windows installer
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Publish DeepSharp
+        run: dotnet publish DeepSharp.csproj --configuration Release --runtime win-x64 --self-contained false --output dist/DeepSharp-Avalonia-english
+
+      - name: Publish GUI launcher
+        run: dotnet publish Launcher/DeepSharpLauncher.csproj --configuration Release --runtime win-x64 --self-contained false --output dist/DeepSharp-Avalonia-english
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) {
+            $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+            $compilerCandidate = Get-ChildItem -Path "$programFilesX86\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($compilerCandidate) { $compiler = $compilerCandidate.FullName }
+          }
+          if (-not $compiler) { throw 'Inno Setup compiler (ISCC.exe) was not found.' }
+          & $compiler $env:GITHUB_WORKSPACE\DeepSharp-Setup.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSharp-Windows-Installer
+          path: installer/DeepSharp-Setup.exe
+          if-no-files-found: error
+
+  publish-nightly:
+    name: Publish nightly release
+    needs: build-installer
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out master history
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DeepSharp-Windows-Installer
+          path: installer
+
+      - name: Move nightly tag to this build
+        shell: pwsh
+        run: |
+          $target = '${{ github.sha }}'
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $mergeCommit = '${{ github.event.pull_request.merge_commit_sha }}'
+            if ($mergeCommit) { $target = $mergeCommit }
+          }
+          git fetch origin master
+          git tag --force nightly $target
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git push origin refs/tags/nightly --force
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Create or update nightly release
+        shell: pwsh
+        run: |
+          $asset = 'installer/DeepSharp-Setup.exe'
+          $notes = "Windows installer built from commit $env:GITHUB_SHA."
+          gh release view nightly *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit nightly --title 'DeepSharp Nightly' --notes $notes --prerelease
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            gh release upload nightly $asset --clobber
+          } else {
+            gh release create nightly $asset --title 'DeepSharp Nightly' --notes $notes --prerelease
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

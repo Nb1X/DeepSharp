@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AssemblyName>DeepSharp</AssemblyName>
+    <RootNamespace>DeepSharp</RootNamespace>
+    <ApplicationIcon>appicon.ico</ApplicationIcon>
+    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);publish/**;**/publish/**;publish-*/**;**/publish-*/**;Launcher/**;**/Launcher/**</DefaultItemExcludesInProjectFolder>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="appicon.ico" />
+    <PackageReference Include="Wasmtime" Version="48.0.2" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
+  </ItemGroup>
+</Project>
+

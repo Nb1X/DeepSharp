@@ -1,0 +1,36 @@
+# .NET build output
+**/bin/
+**/obj/
+**/publish/
+**/publish-*/
+artifacts/
+dist/
+installer/*.exe
+installer/*.iss
+
+# IDE and local workspace files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Local configuration and conversation data
+config.json
+sessions.json
+memory.json
+.env
+.env.*
+!.env.example
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
